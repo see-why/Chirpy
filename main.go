@@ -22,8 +22,15 @@ func (cfg *apiConfig) middlewareMetricInc(next http.Handler) http.Handler {
 
 func (cfg *apiConfig) middlewareGetMetrics(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Write([]byte(fmt.Sprintf("Hits: %d", cfg.fileserverHits.Load())))
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(
+		`<html>
+			<body>
+				<h1>Welcome, Chirpy Admin</h1>
+				<p>Chirpy has been visited ` + fmt.Sprint(cfg.fileserverHits.Load()) + ` times!</p>
+			</body>
+		</html>
+		`))
 }
 
 func (cfg *apiConfig) middlewareResetMetrics(w http.ResponseWriter, req *http.Request) {
@@ -46,8 +53,8 @@ func main() {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Write([]byte(http.StatusText(http.StatusOK)))
 	})
-	m.HandleFunc("GET /api/metrics", apiCfg.middlewareGetMetrics)
-	m.HandleFunc("POST /api/reset", apiCfg.middlewareResetMetrics)
+	m.HandleFunc("GET /admin/metrics", apiCfg.middlewareGetMetrics)
+	m.HandleFunc("POST /admin/reset", apiCfg.middlewareResetMetrics)
 
 	srv := http.Server{
 		Handler:      m,
