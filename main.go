@@ -40,14 +40,14 @@ func main() {
 	const addr = ":8080"
 
 	m := http.NewServeMux()
-	m.Handle("/app/", http.StripPrefix("/app", apiCfg.middlewareMetricInc(http.FileServer(http.Dir(filepathRoot)))))
-	m.HandleFunc("GET /healthz", func(w http.ResponseWriter, req *http.Request) {
+	m.Handle("GET /app/", http.StripPrefix("/app", apiCfg.middlewareMetricInc(http.FileServer(http.Dir(filepathRoot)))))
+	m.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Write([]byte(http.StatusText(http.StatusOK)))
 	})
-	m.HandleFunc("GET /metrics", apiCfg.middlewareGetMetrics)
-	m.HandleFunc("POST /reset", apiCfg.middlewareResetMetrics)
+	m.HandleFunc("GET /api/metrics", apiCfg.middlewareGetMetrics)
+	m.HandleFunc("POST /api/reset", apiCfg.middlewareResetMetrics)
 
 	srv := http.Server{
 		Handler:      m,
