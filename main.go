@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -52,6 +54,60 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Write([]byte(http.StatusText(http.StatusOK)))
+	})
+	m.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, req *http.Request) {
+		type chirp struct {
+			Body string `json:"body"`
+		}
+
+		decoder := json.NewDecoder(req.Body)
+		params := chirp{}
+		err := decoder.Decode(&params)
+		fmt.Printf("Request Body Length: %d \n", len(params.Body))
+
+		type errorResponse struct {
+			Error string `json:"error"`
+		}
+
+		if err != nil || params.Body == "" {
+			fmt.Printf("Error decoding params: %s \n", err)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+			resp := errorResponse{Error: "Something went wrong"}
+			respBody, _ := json.Marshal(resp)
+
+			w.Write([]byte(respBody))
+			return
+		}
+
+		if len(params.Body) > 140 {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+			resp := errorResponse{Error: "Chirp is too long"}
+			respBody, _ := json.Marshal(resp)
+
+			w.Write([]byte(respBody))
+			return
+		}
+
+		words := strings.Split(params.Body, " ")
+		for ind, word := range words {
+			lowerCaseWord := strings.ToLower(word)
+			if lowerCaseWord == "kerfuffle" || lowerCaseWord == "sharbert" || lowerCaseWord == "fornax" {
+				words[ind] = "****"
+			}
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+		resp := struct {
+			CleanedBody string `json:"cleaned_body"`
+		}{CleanedBody: strings.Join(words, " ")}
+		respBody, _ := json.Marshal(resp)
+		w.Write([]byte(respBody))
 	})
 	m.HandleFunc("GET /admin/metrics", apiCfg.middlewareGetMetrics)
 	m.HandleFunc("POST /admin/reset", apiCfg.middlewareResetMetrics)
