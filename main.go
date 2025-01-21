@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 type apiConfig struct {
