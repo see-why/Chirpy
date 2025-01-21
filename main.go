@@ -1,19 +1,24 @@
 package main
 
 import (
+	"chirpy/internal/database"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	queries        *database.Queries
 }
 
 func (cfg *apiConfig) middlewareMetricInc(next http.Handler) http.Handler {
@@ -47,6 +52,12 @@ func (cfg *apiConfig) middlewareResetMetrics(w http.ResponseWriter, req *http.Re
 var apiCfg = &apiConfig{}
 
 func main() {
+	godotenv.Load()
+	dbUrl := os.Getenv("DB_URL")
+	db, _ := sql.Open("postgres", dbUrl)
+	dbQueries := database.New(db)
+	apiCfg.queries = dbQueries
+
 	const filepathRoot = "."
 	const addr = ":8080"
 
