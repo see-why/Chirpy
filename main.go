@@ -110,6 +110,55 @@ func main() {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Write([]byte(http.StatusText(http.StatusOK)))
 	})
+	m.HandleFunc("GET /api/chirps/{chirpID}", func(w http.ResponseWriter, req *http.Request) {
+		chirpID := strings.TrimPrefix(req.URL.Path, "/api/chirps/")
+		chirpUUID, err := uuid.Parse(chirpID)
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Invalid chirp ID"}`))
+			return
+		}
+
+		chirp, err := apiCfg.queries.SelectChirp(req.Context(), chirpUUID)
+
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				w.WriteHeader(http.StatusNotFound)
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				w.Write([]byte(`{"error": "Chirp not found"}`))
+				return
+			}
+			fmt.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+		type chirpResponse struct {
+			Id         string    `json:"id"`
+			CreateAt   time.Time `json:"created_at"`
+			Updated_at time.Time `json:"updated_at"`
+			Body       string    `json:"body"`
+			UserId     string    `json:"user_id"`
+		}
+
+		response := chirpResponse{
+			Id:         chirp.ID.String(),
+			CreateAt:   chirp.CreatedAt,
+			Updated_at: chirp.UpdatedAt,
+			Body:       chirp.Body,
+			UserId:     chirp.UserID.UUID.String(),
+		}
+
+		responseJSON, _ := json.Marshal(&response)
+		w.Write([]byte(responseJSON))
+	})
 	m.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, req *http.Request) {
 		chirps, err := apiCfg.queries.SelectChirps(req.Context())
 
