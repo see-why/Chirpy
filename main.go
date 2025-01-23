@@ -122,6 +122,37 @@ func main() {
 		respBody, _ := json.Marshal(resp)
 		w.Write([]byte(respBody))
 	})
+	m.HandleFunc("POST /api/users", func(w http.ResponseWriter, req *http.Request) {
+		type userEmail struct {
+			Email string `json:"email"`
+		}
+
+		decoder := json.NewDecoder(req.Body)
+		params := userEmail{}
+		err := decoder.Decode(&params)
+
+		if err != nil || params.Email == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Invalid request"}`))
+			return
+		}
+
+		user, err := apiCfg.queries.CreateUser(req.Context(), params.Email)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+		response, _ := json.Marshal(user)
+		w.Write([]byte(response))
+	})
 	m.HandleFunc("GET /admin/metrics", apiCfg.middlewareGetMetrics)
 	m.HandleFunc("POST /admin/reset", apiCfg.middlewareResetMetrics)
 
