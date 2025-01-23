@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
@@ -65,6 +66,26 @@ func (cfg *apiConfig) middlewareResetMetrics(w http.ResponseWriter, req *http.Re
 	w.Write([]byte(fmt.Sprintf("Hits: %d", cfg.fileserverHits.Load())))
 }
 
+func validateBody(body string) (string, string) {
+	if body == "" {
+		return body, "Something went wrong"
+	}
+
+	if len(body) > 140 {
+		return body, "Chirp is too long"
+	}
+
+	words := strings.Split(body, " ")
+	for ind, word := range words {
+		lowerCaseWord := strings.ToLower(word)
+		if lowerCaseWord == "kerfuffle" || lowerCaseWord == "sharbert" || lowerCaseWord == "fornax" {
+			words[ind] = "****"
+		}
+	}
+
+	return strings.Join(words, " "), ""
+}
+
 var apiCfg = &apiConfig{}
 
 func main() {
@@ -87,6 +108,62 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Write([]byte(http.StatusText(http.StatusOK)))
+	})
+	m.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, req *http.Request) {
+
+		type chirpParams struct {
+			Body   string    `json:"body"`
+			UserId uuid.UUID `json:"user_id"`
+		}
+
+		decoder := json.NewDecoder(req.Body)
+		params := chirpParams{}
+		err := decoder.Decode(&params)
+
+		if err != nil || params.Body == "" || params.UserId == uuid.Nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Invalid request"}`))
+			return
+		}
+
+		createChirpParams := struct {
+			UserID uuid.NullUUID
+			Body   string
+		}{
+			UserID: uuid.NullUUID{UUID: params.UserId, Valid: true},
+			Body:   params.Body,
+		}
+
+		chirp, err := apiCfg.queries.CreateChirp(req.Context(), createChirpParams)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+		responseStruct := struct {
+			Id         string    `json:"id"`
+			CreateAt   time.Time `json:"created_at"`
+			Updated_at time.Time `json:"updated_at"`
+			Body       string    `json:"body"`
+			UserId     string    `json:"user_id"`
+		}{
+			Id:         chirp.ID.String(),
+			CreateAt:   chirp.CreatedAt,
+			Updated_at: chirp.UpdatedAt,
+			Body:       chirp.Body,
+			UserId:     chirp.UserID.UUID.String(),
+		}
+
+		response, _ := json.Marshal(&responseStruct)
+		w.Write([]byte(response))
+
 	})
 	m.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, req *http.Request) {
 		type chirp struct {
