@@ -4,6 +4,7 @@ import (
 	"chirpy/internal/database"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -66,13 +67,13 @@ func (cfg *apiConfig) middlewareResetMetrics(w http.ResponseWriter, req *http.Re
 	w.Write([]byte(fmt.Sprintf("Hits: %d", cfg.fileserverHits.Load())))
 }
 
-func validateBody(body string) (string, string) {
+func validateBody(body string) (string, error) {
 	if body == "" {
-		return body, "Something went wrong"
+		return body, errors.New("something went wrong")
 	}
 
 	if len(body) > 140 {
-		return body, "Chirp is too long"
+		return body, errors.New("chirp is too long")
 	}
 
 	words := strings.Split(body, " ")
@@ -83,7 +84,7 @@ func validateBody(body string) (string, string) {
 		}
 	}
 
-	return strings.Join(words, " "), ""
+	return strings.Join(words, " "), nil
 }
 
 var apiCfg = &apiConfig{}
@@ -110,7 +111,6 @@ func main() {
 		w.Write([]byte(http.StatusText(http.StatusOK)))
 	})
 	m.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, req *http.Request) {
-
 		type chirpParams struct {
 			Body   string    `json:"body"`
 			UserId uuid.UUID `json:"user_id"`
@@ -124,6 +124,15 @@ func main() {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.Write([]byte(`{"error": "Invalid request"}`))
+			return
+		}
+
+		params.Body, err = validateBody(params.Body)
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "` + err.Error() + `"}`))
 			return
 		}
 
