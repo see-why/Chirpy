@@ -19,6 +19,7 @@ import (
 type apiConfig struct {
 	fileserverHits atomic.Int32
 	queries        *database.Queries
+	platform       string
 }
 
 func (cfg *apiConfig) middlewareMetricInc(next http.Handler) http.Handler {
@@ -43,6 +44,21 @@ func (cfg *apiConfig) middlewareGetMetrics(w http.ResponseWriter, req *http.Requ
 }
 
 func (cfg *apiConfig) middlewareResetMetrics(w http.ResponseWriter, req *http.Request) {
+	if apiCfg.platform != "dev" {
+		w.WriteHeader(http.StatusForbidden)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write([]byte("Resetting metrics is only allowed in local environment"))
+		return
+	}
+
+	err := apiCfg.queries.DeleteUser(req.Context())
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write([]byte("Internal server error"))
+	}
+
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	cfg.fileserverHits.Store(0)
@@ -54,9 +70,13 @@ var apiCfg = &apiConfig{}
 func main() {
 	godotenv.Load()
 	dbUrl := os.Getenv("DB_URL")
+	platform := os.Getenv("PLATFORM")
+
 	db, _ := sql.Open("postgres", dbUrl)
 	dbQueries := database.New(db)
+
 	apiCfg.queries = dbQueries
+	apiCfg.platform = platform
 
 	const filepathRoot = "."
 	const addr = ":8080"
@@ -150,7 +170,19 @@ func main() {
 		w.WriteHeader(http.StatusCreated)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-		response, _ := json.Marshal(user)
+		responseStruct := struct {
+			Id         string    `json:"id"`
+			CreateAt   time.Time `json:"created_at"`
+			Updated_at time.Time `json:"updated_at"`
+			Email      string    `json:"email"`
+		}{
+			Id:         user.ID.String(),
+			CreateAt:   user.CreatedAt,
+			Updated_at: user.UpdatedAt,
+			Email:      user.Email,
+		}
+
+		response, _ := json.Marshal(&responseStruct)
 		w.Write([]byte(response))
 	})
 	m.HandleFunc("GET /admin/metrics", apiCfg.middlewareGetMetrics)
