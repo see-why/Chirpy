@@ -210,6 +210,40 @@ func main() {
 		w.Write([]byte(response))
 
 	})
+	m.HandleFunc("GET /api/users", func(w http.ResponseWriter, req *http.Request) {
+		users, err := apiCfg.queries.SelectUsers(req.Context())
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+		type userResponse struct {
+			Id         string    `json:"id"`
+			CreateAt   time.Time `json:"created_at"`
+			Updated_at time.Time `json:"updated_at"`
+			Email      string    `json:"email"`
+		}
+
+		response := make([]userResponse, len(users))
+
+		for i, user := range users {
+			response[i] = userResponse{
+				Id:         user.ID.String(),
+				CreateAt:   user.CreatedAt,
+				Updated_at: user.UpdatedAt,
+				Email:      user.Email,
+			}
+		}
+
+		responseJSON, _ := json.Marshal(&response)
+		w.Write([]byte(responseJSON))
+	})
 	m.HandleFunc("POST /api/users", func(w http.ResponseWriter, req *http.Request) {
 		type userEmail struct {
 			Email string `json:"email"`
