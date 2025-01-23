@@ -8,3 +8,6 @@ VALUES (
     $2
 )
 RETURNING *;
+
+-- name: SelectChirps :many
+SELECT * FROM chirps;
