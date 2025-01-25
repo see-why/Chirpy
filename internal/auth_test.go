@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"math"
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -216,5 +217,33 @@ func TestValidateJWT_ValidToken(t *testing.T) {
 	// Check if the parsed user ID matches the original user ID
 	if parsedUserID != userID {
 		t.Errorf("expected user ID %s, got %s", userID, parsedUserID)
+	}
+}
+
+func TestGetBearerTokenFromHeader_EmptyAuthorizationHeader(t *testing.T) {
+	header := http.Header{}
+	_, err := GetBearerTokenFromHeader(header)
+	if err == nil || err.Error() != "missing Authorization header" {
+		t.Errorf("expected 'missing Authorization header' error, got %v", err)
+	}
+}
+
+func TestGetBearerTokenFromHeader_BearerWithoutToken(t *testing.T) {
+	header := http.Header{}
+	header.Set("Authorization", "Bearer")
+
+	_, err := GetBearerTokenFromHeader(header)
+	if err == nil || err.Error() != "invalid Authorization header" {
+		t.Errorf("expected 'invalid Authorization header' error, got %v", err)
+	}
+}
+
+func TestGetBearerTokenFromHeader_MoreThanTwoParts(t *testing.T) {
+	header := http.Header{}
+	header.Set("Authorization", "Bearer token extraPart")
+
+	_, err := GetBearerTokenFromHeader(header)
+	if err == nil || err.Error() != "invalid Authorization header" {
+		t.Errorf("expected 'invalid Authorization header' error, got %v", err)
 	}
 }
