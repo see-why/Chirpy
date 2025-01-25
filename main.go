@@ -500,8 +500,35 @@ func main() {
 			return
 		}
 
-		
-	}
+		refreshToken, err := apiCfg.queries.GetAccessTokenFromRefreshToken(req.Context(), token)
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Unauthorized Request"}`))
+			return
+		}
+
+		token, err = auth.MakeJWT(refreshToken.UserID.UUID, apiCfg.tokenSecret, time.Hour)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		response, err := json.Marshal(map[string]string{
+			"token": token,
+		})
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
+			return
+		}
+		w.Write([]byte(response))
+	})
 
 	srv := http.Server{
 		Handler:      m,
