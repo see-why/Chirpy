@@ -25,6 +25,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	queries        *database.Queries
 	platform       string
+	tokenSecret    string
 }
 
 func (cfg *apiConfig) middlewareMetricInc(next http.Handler) http.Handler {
@@ -111,12 +112,14 @@ func main() {
 	godotenv.Load()
 	dbUrl := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
+	tokenSecret := os.Getenv("JWT_SECRET")
 
 	db, _ := sql.Open("postgres", dbUrl)
 	dbQueries := database.New(db)
 
 	apiCfg.queries = dbQueries
 	apiCfg.platform = platform
+	apiCfg.tokenSecret = tokenSecret
 
 	const filepathRoot = "."
 	const addr = ":8080"
