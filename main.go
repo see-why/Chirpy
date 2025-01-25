@@ -217,6 +217,24 @@ func main() {
 		w.Write([]byte(responseJSON))
 	})
 	m.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, req *http.Request) {
+		token, err := auth.GetBearerTokenFromHeader(req.Header)
+
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Unauthorized Request"}`))
+			return
+		}
+
+		userID, err := auth.ValidateJWT(token, apiCfg.tokenSecret)
+
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Token is invalid"}`))
+			return
+		}
+
 		type chirpParams struct {
 			Body   string    `json:"body"`
 			UserId uuid.UUID `json:"user_id"`
@@ -224,7 +242,9 @@ func main() {
 
 		decoder := json.NewDecoder(req.Body)
 		params := chirpParams{}
-		err := decoder.Decode(&params)
+		err = decoder.Decode(&params)
+
+		params.UserId = userID
 
 		if err != nil || params.Body == "" || params.UserId == uuid.Nil {
 			w.WriteHeader(http.StatusBadRequest)
