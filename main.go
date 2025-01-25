@@ -3,6 +3,7 @@ package main
 import (
 	auth "chirpy/internal"
 	"chirpy/internal/database"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -87,6 +88,21 @@ func validateBody(body string) (string, error) {
 	}
 
 	return strings.Join(words, " "), nil
+}
+
+func validateAndCheckEmail(email string, queries *database.Queries, ctx context.Context) (database.User, error) {
+	emailFormat := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
+	matched, err := regexp.MatchString(emailFormat, email)
+	if err != nil || !matched {
+		return database.User{}, errors.New("invalid email")
+	}
+
+	user, err := queries.GetUserByEmail(ctx, email)
+	if err == nil {
+		return user, errors.New("email already exists")
+	}
+
+	return database.User{}, nil
 }
 
 var apiCfg = &apiConfig{}
@@ -312,20 +328,11 @@ func main() {
 			return
 		}
 
-		emailFormat := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
-		matched, err := regexp.MatchString(emailFormat, params.Email)
-		if err != nil || !matched {
+		_, err = validateAndCheckEmail(params.Email, apiCfg.queries, req.Context())
+		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			w.Write([]byte(`{"error": "Invalid email"}`))
-			return
-		}
-
-		_, err = apiCfg.queries.GetUserByEmail(req.Context(), params.Email)
-		if err == nil {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			w.Write([]byte(`{"error": "Email already exists"}`))
+			w.Write([]byte(fmt.Sprintf(`{"error": "%s"}`, err.Error())))
 			return
 		}
 
@@ -373,6 +380,56 @@ func main() {
 	})
 	m.HandleFunc("GET /admin/metrics", apiCfg.middlewareGetMetrics)
 	m.HandleFunc("POST /admin/reset", apiCfg.middlewareResetMetrics)
+	m.HandleFunc("POST /api/login", func(w http.ResponseWriter, req *http.Request) {
+		var params struct {
+			Email    string `json:"email"`
+			Password string `json:"password"`
+		}
+
+		decoder := json.NewDecoder(req.Body)
+		err := decoder.Decode(&params)
+
+		if err != nil || params.Email == "" || params.Password == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Invalid request"}`))
+			return
+		}
+
+		user, err := apiCfg.queries.GetUserByEmail(req.Context(), params.Email)
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Invalid email or password"}`))
+		}
+
+		err = auth.ComparePassword(user.HashedPassword, params.Password)
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Invalid email or password"}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+		responseStruct := struct {
+			Id         string    `json:"id"`
+			CreateAt   time.Time `json:"created_at"`
+			Updated_at time.Time `json:"updated_at"`
+			Email      string    `json:"email"`
+		}{
+			Id:         user.ID.String(),
+			CreateAt:   user.CreatedAt,
+			Updated_at: user.UpdatedAt,
+			Email:      user.Email,
+		}
+
+		response, _ := json.Marshal(&responseStruct)
+		w.Write([]byte(response))
+
+	})
 
 	srv := http.Server{
 		Handler:      m,
