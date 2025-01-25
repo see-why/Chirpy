@@ -247,3 +247,25 @@ func TestGetBearerTokenFromHeader_MoreThanTwoParts(t *testing.T) {
 		t.Errorf("expected 'invalid Authorization header' error, got %v", err)
 	}
 }
+
+func TestMakeRefreshToken_NonEmptyString(t *testing.T) {
+	token, err := MakeRefreshToken()
+	if err != nil {
+		t.Fatalf("unexpected error when generating refresh token: %v", err)
+	}
+
+	if token == "" {
+		t.Error("expected a non-empty string for refresh token, got an empty string")
+	}
+}
+
+func TestMakeRefreshToken_Length(t *testing.T) {
+	token, err := MakeRefreshToken()
+	if err != nil {
+		t.Fatalf("unexpected error when generating refresh token: %v", err)
+	}
+
+	if len(token) != 64 {
+		t.Errorf("expected token length to be 64, got %d", len(token))
+	}
+}
