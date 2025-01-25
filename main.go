@@ -529,6 +529,27 @@ func main() {
 		}
 		w.Write([]byte(response))
 	})
+	m.HandleFunc("POST /api/revoke", func(w http.ResponseWriter, req *http.Request) {
+		token, err := auth.GetBearerTokenFromHeader(req.Header)
+
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Unauthorized Request"}`))
+			return
+		}
+
+		err = apiCfg.queries.RevokeRefreshToken(req.Context(), token)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	})
 
 	srv := http.Server{
 		Handler:      m,
