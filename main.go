@@ -385,8 +385,9 @@ func main() {
 	m.HandleFunc("POST /admin/reset", apiCfg.middlewareResetMetrics)
 	m.HandleFunc("POST /api/login", func(w http.ResponseWriter, req *http.Request) {
 		var params struct {
-			Email    string `json:"email"`
-			Password string `json:"password"`
+			Email            string `json:"email"`
+			Password         string `json:"password"`
+			ExpiresInSeconds int    `json:"expires_in_seconds"`
 		}
 
 		decoder := json.NewDecoder(req.Body)
@@ -414,6 +415,17 @@ func main() {
 			return
 		}
 
+		if params.ExpiresInSeconds == 0 || params.ExpiresInSeconds > 3600 {
+			params.ExpiresInSeconds = 3600
+		}
+
+		token, err := auth.MakeJWT(user.ID, apiCfg.tokenSecret, time.Duration(params.ExpiresInSeconds)*time.Second)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
+		}
+
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
@@ -422,11 +434,13 @@ func main() {
 			CreateAt   time.Time `json:"created_at"`
 			Updated_at time.Time `json:"updated_at"`
 			Email      string    `json:"email"`
+			Token      string    `json:"token"`
 		}{
 			Id:         user.ID.String(),
 			CreateAt:   user.CreatedAt,
 			Updated_at: user.UpdatedAt,
 			Email:      user.Email,
+			Token:      token,
 		}
 
 		response, _ := json.Marshal(&responseStruct)
