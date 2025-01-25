@@ -53,3 +53,45 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 	)
 	return i, err
 }
+
+const getAccessTokenFromRefreshToken = `-- name: GetAccessTokenFromRefreshToken :one
+SELECT id, user_id, token, revoked_at, expires_at, created_at, updated_at
+FROM refresh_tokens
+WHERE token = $1 AND revoked_at IS NULL AND expires_at > NOW()
+`
+
+type GetAccessTokenFromRefreshTokenRow struct {
+	ID        uuid.UUID
+	UserID    uuid.NullUUID
+	Token     string
+	RevokedAt sql.NullTime
+	ExpiresAt time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) GetAccessTokenFromRefreshToken(ctx context.Context, token string) (GetAccessTokenFromRefreshTokenRow, error) {
+	row := q.db.QueryRowContext(ctx, getAccessTokenFromRefreshToken, token)
+	var i GetAccessTokenFromRefreshTokenRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Token,
+		&i.RevokedAt,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserFromRefreshToken = `-- name: GetUserFromRefreshToken :one
+SELECT user_id FROM refresh_tokens WHERE token = $1 AND revoked_at IS NULL AND expires_at > NOW()
+`
+
+func (q *Queries) GetUserFromRefreshToken(ctx context.Context, token string) (uuid.NullUUID, error) {
+	row := q.db.QueryRowContext(ctx, getUserFromRefreshToken, token)
+	var user_id uuid.NullUUID
+	err := row.Scan(&user_id)
+	return user_id, err
+}
