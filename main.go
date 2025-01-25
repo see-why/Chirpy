@@ -444,29 +444,64 @@ func main() {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.Write([]byte(`{"error": "Internal server error"}`))
+			return
+		}
+
+		refreshToken, err := auth.MakeRefreshToken()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
+		}
+
+		createRefreshTokenParams := database.CreateRefreshTokenParams{
+			UserID:    uuid.NullUUID{UUID: user.ID, Valid: true},
+			Token:     refreshToken,
+			ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
+		}
+		_, err = apiCfg.queries.CreateRefreshToken(req.Context(), createRefreshTokenParams)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
 		}
 
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 		responseStruct := struct {
-			Id         string    `json:"id"`
-			CreateAt   time.Time `json:"created_at"`
-			Updated_at time.Time `json:"updated_at"`
-			Email      string    `json:"email"`
-			Token      string    `json:"token"`
+			Id           string    `json:"id"`
+			CreateAt     time.Time `json:"created_at"`
+			Updated_at   time.Time `json:"updated_at"`
+			Email        string    `json:"email"`
+			Token        string    `json:"token"`
+			RefreshToken string    `json:"refresh_token"`
 		}{
-			Id:         user.ID.String(),
-			CreateAt:   user.CreatedAt,
-			Updated_at: user.UpdatedAt,
-			Email:      user.Email,
-			Token:      token,
+			Id:           user.ID.String(),
+			CreateAt:     user.CreatedAt,
+			Updated_at:   user.UpdatedAt,
+			Email:        user.Email,
+			Token:        token,
+			RefreshToken: refreshToken,
 		}
 
 		response, _ := json.Marshal(&responseStruct)
 		w.Write([]byte(response))
 
 	})
+	m.HandleFunc("POST /api/refresh", func(w http.ResponseWriter, req *http.Request) {
+		token, err := auth.GetBearerTokenFromHeader(req.Header)
+
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Unauthorized Request"}`))
+			return
+		}
+
+		
+	}
 
 	srv := http.Server{
 		Handler:      m,
