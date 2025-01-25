@@ -1,6 +1,15 @@
 package auth
 
-import "testing"
+import (
+	"fmt"
+	"math"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+)
 
 func TestHashPassword_EmptyString(t *testing.T) {
 	_, err := HashPassword("")
@@ -83,5 +92,129 @@ func TestComparePassword_InvalidHashFormat(t *testing.T) {
 	err := ComparePassword(invalidHash, password)
 	if err == nil {
 		t.Error("expected an error when comparing a password with an invalid hash format, got nil")
+	}
+}
+
+func TestMakeJWT_ValidToken(t *testing.T) {
+	userID := uuid.New()
+	tokenSecret := "testSecret"
+	expiresIn := time.Hour
+
+	os.Setenv("JWT_SECRET", tokenSecret)
+	defer os.Unsetenv("JWT_SECRET")
+
+	token, err := MakeJWT(userID, tokenSecret, expiresIn)
+	if err != nil {
+		t.Fatalf("unexpected error when creating JWT: %v", err)
+	}
+
+	parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(tokenSecret), nil
+	})
+
+	if err != nil {
+		t.Fatalf("error parsing JWT token: %v", err)
+	}
+
+	if !parsedToken.Valid {
+		t.Error("expected a valid token, got an invalid token")
+	}
+
+	claims, ok := parsedToken.Claims.(jwt.MapClaims)
+	if !ok {
+		t.Fatal("failed to extract claims from token")
+	}
+
+	if claims["sub"] != userID.String() {
+		t.Errorf("expected subject claim to be %s, got %s", userID.String(), claims["sub"])
+	}
+
+	if claims["iss"] != "chirpy" {
+		t.Errorf("expected issuer claim to be 'chirpy', got %s", claims["iss"])
+	}
+
+	issuedAt, ok := claims["iat"].(float64)
+	if !ok {
+		t.Fatal("failed to extract issued at claim")
+	}
+	if time.Now().UTC().Sub(time.Unix(int64(issuedAt), 0)) > time.Second {
+		t.Error("issued at time is not within the expected range")
+	}
+
+	expiresAt, ok := claims["exp"].(float64)
+	if !ok {
+		t.Fatal("failed to extract expiration claim")
+	}
+	expectedExpiration := time.Now().UTC().Add(expiresIn)
+	if math.Abs(expectedExpiration.Sub(time.Unix(int64(expiresAt), 0)).Seconds()) > 1 {
+		t.Error("expiration time is not within the expected range")
+	}
+}
+
+func TestValidateJWT_InvalidTokenFormat(t *testing.T) {
+	invalidToken := "invalidTokenFormat"
+	tokenSecret := "testSecret"
+
+	_, err := ValidateJWT(invalidToken, tokenSecret)
+	if err == nil {
+		t.Error("expected an error when parsing an invalid token format, got nil")
+	}
+}
+
+func TestValidateJWT_InvalidUUIDSubject(t *testing.T) {
+	invalidUUIDToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+		Subject: "not-a-valid-uuid",
+	})
+	tokenSecret := "testSecret"
+	tokenString, err := invalidUUIDToken.SignedString([]byte(tokenSecret))
+	if err != nil {
+		t.Fatalf("unexpected error when signing token: %v", err)
+	}
+
+	_, err = ValidateJWT(tokenString, tokenSecret)
+	if err == nil || err.Error() != "invalid user ID in token" {
+		t.Errorf("expected 'invalid user ID in token' error, got %v", err)
+	}
+}
+
+func TestValidateJWT_MissingClaims(t *testing.T) {
+	// Create a token with missing claims
+	token := jwt.New(jwt.SigningMethodHS256)
+	tokenSecret := "testSecret"
+	tokenString, err := token.SignedString([]byte(tokenSecret))
+	if err != nil {
+		t.Fatalf("unexpected error when signing token: %v", err)
+	}
+
+	// Validate the token
+	_, err = ValidateJWT(tokenString, tokenSecret)
+	if err == nil {
+		t.Error("expected an error when validating a token with missing claims, got nil")
+	}
+}
+
+func TestValidateJWT_ValidToken(t *testing.T) {
+	userID := uuid.New()
+	tokenSecret := "testSecret"
+	expiresIn := time.Hour
+
+	// Create a JWT token with valid claims
+	token, err := MakeJWT(userID, tokenSecret, expiresIn)
+	if err != nil {
+		t.Fatalf("unexpected error when creating JWT: %v", err)
+	}
+
+	// Validate the token
+	parsedUserID, err := ValidateJWT(token, tokenSecret)
+	if err != nil {
+		t.Fatalf("unexpected error when validating JWT: %v", err)
+	}
+
+	// Check if the parsed user ID matches the original user ID
+	if parsedUserID != userID {
+		t.Errorf("expected user ID %s, got %s", userID, parsedUserID)
 	}
 }
