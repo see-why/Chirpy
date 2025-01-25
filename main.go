@@ -1,6 +1,7 @@
 package main
 
 import (
+	auth "chirpy/internal"
 	"chirpy/internal/database"
 	"database/sql"
 	"encoding/json"
@@ -295,21 +296,37 @@ func main() {
 	})
 	m.HandleFunc("POST /api/users", func(w http.ResponseWriter, req *http.Request) {
 		type userEmail struct {
-			Email string `json:"email"`
+			Email    string `json:"email"`
+			Password string `json:"password"`
 		}
 
 		decoder := json.NewDecoder(req.Body)
 		params := userEmail{}
 		err := decoder.Decode(&params)
 
-		if err != nil || params.Email == "" {
+		if err != nil || params.Email == "" || params.Password == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.Write([]byte(`{"error": "Invalid request"}`))
 			return
 		}
 
-		user, err := apiCfg.queries.CreateUser(req.Context(), params.Email)
+		hashedPassord, err := auth.HashPassword(params.Password)
+
+		if err != nil {
+			fmt.Printf("error hashing password: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Invalid password"}`))
+			return
+		}
+
+		createUserParams := database.CreateUserParams{
+			Email:          params.Email,
+			HashedPassword: hashedPassord,
+		}
+
+		user, err := apiCfg.queries.CreateUser(req.Context(), createUserParams)
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
