@@ -38,5 +38,4 @@ go.work.sum
 *.tmp
 *.temp
 out
-/tmp
-internal/tmp
+**/tmp/
