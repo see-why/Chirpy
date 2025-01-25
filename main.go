@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -308,6 +309,23 @@ func main() {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.Write([]byte(`{"error": "Invalid request"}`))
+			return
+		}
+
+		emailFormat := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
+		matched, err := regexp.MatchString(emailFormat, params.Email)
+		if err != nil || !matched {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Invalid email"}`))
+			return
+		}
+
+		_, err = apiCfg.queries.GetUserByEmail(req.Context(), params.Email)
+		if err == nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Email already exists"}`))
 			return
 		}
 
