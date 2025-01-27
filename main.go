@@ -401,6 +401,92 @@ func main() {
 		response, _ := json.Marshal(&responseStruct)
 		w.Write([]byte(response))
 	})
+	m.HandleFunc("PUT /api/users", func(w http.ResponseWriter, req *http.Request) {
+		token, err := auth.GetBearerTokenFromHeader(req.Header)
+
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Unauthorized Request"}`))
+			return
+		}
+
+		userID, err := auth.ValidateJWT(token, apiCfg.tokenSecret)
+
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Token is invalid"}`))
+			return
+		}
+
+		type userParams struct {
+			Email    string `json:"email"`
+			Password string `json:"password"`
+		}
+
+		params := userParams{}
+
+		decoder := json.NewDecoder(req.Body)
+		err = decoder.Decode(&params)
+
+		if err != nil || params.Email == "" || params.Password == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Invalid request"}`))
+			return
+		}
+
+		_, err = validateAndCheckEmail(params.Email, apiCfg.queries, req.Context())
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(fmt.Sprintf(`{"error": "%s"}`, err.Error())))
+			return
+		}
+
+		hashedPassord, err := auth.HashPassword(params.Password)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Invalid password"}`))
+			return
+		}
+
+		updateUserParams := database.UpdateUserParams{
+			Email:          params.Email,
+			HashedPassword: hashedPassord,
+			ID:             userID,
+		}
+
+		user, err := apiCfg.queries.UpdateUser(req.Context(), updateUserParams)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
+			return
+		}
+
+		responseStruct := struct {
+			Id         string    `json:"id"`
+			CreateAt   time.Time `json:"created_at"`
+			Updated_at time.Time `json:"updated_at"`
+			Email      string    `json:"email"`
+		}{
+			Id:         user.ID.String(),
+			CreateAt:   user.CreatedAt,
+			Updated_at: user.UpdatedAt,
+			Email:      user.Email,
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+		response, _ := json.Marshal(&responseStruct)
+		w.Write([]byte(response))
+
+	})
 	m.HandleFunc("GET /admin/metrics", apiCfg.middlewareGetMetrics)
 	m.HandleFunc("POST /admin/reset", apiCfg.middlewareResetMetrics)
 	m.HandleFunc("POST /api/login", func(w http.ResponseWriter, req *http.Request) {
