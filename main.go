@@ -180,6 +180,70 @@ func main() {
 		responseJSON, _ := json.Marshal(&response)
 		w.Write([]byte(responseJSON))
 	})
+	m.HandleFunc("DELETE /api/chirps/{chirpID}", func(w http.ResponseWriter, req *http.Request) {
+		token, err := auth.GetBearerTokenFromHeader(req.Header)
+
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Unauthorized Request"}`))
+			return
+		}
+
+		userID, err := auth.ValidateJWT(token, apiCfg.tokenSecret)
+
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Token is invalid"}`))
+			return
+		}
+
+		chirpID := strings.TrimPrefix(req.URL.Path, "/api/chirps/")
+		chirpUUID, err := uuid.Parse(chirpID)
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Invalid chirp ID"}`))
+			return
+		}
+
+		chirp, err := apiCfg.queries.SelectChirp(req.Context(), chirpUUID)
+
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				w.WriteHeader(http.StatusNotFound)
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				w.Write([]byte(`{"error": "Chirp not found"}`))
+				return
+			}
+			fmt.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
+			return
+		}
+
+		if chirp.UserID.UUID != userID {
+			w.WriteHeader(http.StatusForbidden)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Forbidden"}`))
+			return
+		}
+
+		err = apiCfg.queries.DeleteChirp(req.Context(), chirpUUID)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	})
 	m.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, req *http.Request) {
 		chirps, err := apiCfg.queries.SelectChirps(req.Context())
 
