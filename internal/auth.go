@@ -78,7 +78,7 @@ func GetBearerTokenFromHeader(header http.Header) (string, error) {
 	return parts[1], nil
 }
 
-func GetTokenFromHeader(header http.Header) (string, error) {
+func GetApiTokenFromHeader(header http.Header) (string, error) {
 	token := header.Get("Authorization")
 	if token == "" {
 		return "", errors.New("missing Authorization header")
@@ -88,7 +88,7 @@ func GetTokenFromHeader(header http.Header) (string, error) {
 		return "", errors.New("invalid Authorization header")
 	}
 
-	return parts[1], nil
+	return strings.TrimSpace(parts[1]), nil
 }
 
 func MakeRefreshToken() (string, error) {

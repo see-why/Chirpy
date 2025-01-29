@@ -275,7 +275,7 @@ func TestGetTokenFromHeader_ValidAPIKeyHeader(t *testing.T) {
 	expectedToken := "validAPIKeyToken123"
 	header.Set("Authorization", "APIKey "+expectedToken)
 
-	token, err := GetTokenFromHeader(header)
+	token, err := GetApiTokenFromHeader(header)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
