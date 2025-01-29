@@ -700,6 +700,64 @@ func main() {
 		w.WriteHeader(http.StatusNoContent)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	})
+	m.HandleFunc("POST /api/polka/webhooks", func(w http.ResponseWriter, req *http.Request) {
+		type data struct {
+			UserId string `json:"user_id"`
+		}
+		type webhookParams struct {
+			Event string `json:"event"`
+			Data  data   `json:"data"`
+		}
+
+		var params webhookParams
+		decoder := json.NewDecoder(req.Body)
+		err := decoder.Decode(&params)
+
+		if err != nil || params.Event == "" || params.Data.UserId == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Invalid request"}`))
+			return
+		}
+
+		if params.Event != "user.upgraded" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		userID, err := uuid.Parse(params.Data.UserId)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Invalid user id"}`))
+			return
+		}
+
+		userInfo := database.UpdateUserIsChirpyRedParams{
+			IsChirpyRed: true,
+			ID:          userID,
+		}
+
+		user, err := apiCfg.queries.UpdateUserIsChirpyRed(req.Context(), userInfo)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Internal server error"}`))
+			return
+		}
+
+		if user.ID == uuid.Nil {
+			w.WriteHeader(http.StatusNotFound)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "User not found"}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Write([]byte(``))
+	})
 
 	srv := http.Server{
 		Handler:      m,
