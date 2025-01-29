@@ -269,3 +269,18 @@ func TestMakeRefreshToken_Length(t *testing.T) {
 		t.Errorf("expected token length to be 64, got %d", len(token))
 	}
 }
+
+func TestGetTokenFromHeader_ValidAPIKeyHeader(t *testing.T) {
+	header := http.Header{}
+	expectedToken := "validAPIKeyToken123"
+	header.Set("Authorization", "APIKey "+expectedToken)
+
+	token, err := GetTokenFromHeader(header)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if token != expectedToken {
+		t.Errorf("expected token %s, got %s", expectedToken, token)
+	}
+}
