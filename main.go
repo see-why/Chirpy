@@ -248,6 +248,59 @@ func main() {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	})
 	m.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, req *http.Request) {
+		type chirpResponse struct {
+			Id         string    `json:"id"`
+			CreateAt   time.Time `json:"created_at"`
+			Updated_at time.Time `json:"updated_at"`
+			Body       string    `json:"body"`
+			UserId     string    `json:"user_id"`
+		}
+
+		userID := req.URL.Query().Get("author_id")
+
+		if userID != "" {
+			parsedUserID, err := uuid.Parse(userID)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				w.Write([]byte(`{"error": "Invalid user ID"}`))
+				return
+			}
+
+			chirps, err := apiCfg.queries.SelectChirpsByUserId(req.Context(), uuid.NullUUID{UUID: parsedUserID, Valid: true})
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					w.WriteHeader(http.StatusNotFound)
+					w.Header().Set("Content-Type", "application/json; charset=utf-8")
+					w.Write([]byte(`User has no chirps`))
+					return
+				}
+
+				w.WriteHeader(http.StatusNotFound)
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				w.Write([]byte(`User not found`))
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+			response := make([]chirpResponse, len(chirps))
+
+			for i, chirp := range chirps {
+				response[i] = chirpResponse{
+					Id:         chirp.ID.String(),
+					CreateAt:   chirp.CreatedAt,
+					Updated_at: chirp.UpdatedAt,
+					Body:       chirp.Body,
+					UserId:     chirp.UserID.UUID.String(),
+				}
+			}
+
+			responseJSON, _ := json.Marshal(&response)
+			w.Write([]byte(responseJSON))
+			return
+		}
+
 		chirps, err := apiCfg.queries.SelectChirps(req.Context())
 
 		if err != nil {
@@ -259,14 +312,6 @@ func main() {
 
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-
-		type chirpResponse struct {
-			Id         string    `json:"id"`
-			CreateAt   time.Time `json:"created_at"`
-			Updated_at time.Time `json:"updated_at"`
-			Body       string    `json:"body"`
-			UserId     string    `json:"user_id"`
-		}
 
 		response := make([]chirpResponse, len(chirps))
 
