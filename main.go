@@ -378,20 +378,22 @@ func main() {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 		type userResponse struct {
-			Id         string    `json:"id"`
-			CreateAt   time.Time `json:"created_at"`
-			Updated_at time.Time `json:"updated_at"`
-			Email      string    `json:"email"`
+			Id          string    `json:"id"`
+			CreateAt    time.Time `json:"created_at"`
+			Updated_at  time.Time `json:"updated_at"`
+			Email       string    `json:"email"`
+			IsChirpyRed bool      `json:"is_chirpy_red"`
 		}
 
 		response := make([]userResponse, len(users))
 
 		for i, user := range users {
 			response[i] = userResponse{
-				Id:         user.ID.String(),
-				CreateAt:   user.CreatedAt,
-				Updated_at: user.UpdatedAt,
-				Email:      user.Email,
+				Id:          user.ID.String(),
+				CreateAt:    user.CreatedAt,
+				Updated_at:  user.UpdatedAt,
+				Email:       user.Email,
+				IsChirpyRed: user.IsChirpyRed,
 			}
 		}
 
@@ -451,15 +453,17 @@ func main() {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 		responseStruct := struct {
-			Id         string    `json:"id"`
-			CreateAt   time.Time `json:"created_at"`
-			Updated_at time.Time `json:"updated_at"`
-			Email      string    `json:"email"`
+			Id          string    `json:"id"`
+			CreateAt    time.Time `json:"created_at"`
+			Updated_at  time.Time `json:"updated_at"`
+			Email       string    `json:"email"`
+			IsChirpyRed bool      `json:"is_chirpy_red"`
 		}{
-			Id:         user.ID.String(),
-			CreateAt:   user.CreatedAt,
-			Updated_at: user.UpdatedAt,
-			Email:      user.Email,
+			Id:          user.ID.String(),
+			CreateAt:    user.CreatedAt,
+			Updated_at:  user.UpdatedAt,
+			Email:       user.Email,
+			IsChirpyRed: user.IsChirpyRed,
 		}
 
 		response, _ := json.Marshal(&responseStruct)
@@ -533,15 +537,17 @@ func main() {
 		}
 
 		responseStruct := struct {
-			Id         string    `json:"id"`
-			CreateAt   time.Time `json:"created_at"`
-			Updated_at time.Time `json:"updated_at"`
-			Email      string    `json:"email"`
+			Id          string    `json:"id"`
+			CreateAt    time.Time `json:"created_at"`
+			Updated_at  time.Time `json:"updated_at"`
+			Email       string    `json:"email"`
+			IsChirpyRed bool      `json:"is_chirpy_red"`
 		}{
-			Id:         user.ID.String(),
-			CreateAt:   user.CreatedAt,
-			Updated_at: user.UpdatedAt,
-			Email:      user.Email,
+			Id:          user.ID.String(),
+			CreateAt:    user.CreatedAt,
+			Updated_at:  user.UpdatedAt,
+			Email:       user.Email,
+			IsChirpyRed: user.IsChirpyRed,
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -627,6 +633,7 @@ func main() {
 			Email        string    `json:"email"`
 			Token        string    `json:"token"`
 			RefreshToken string    `json:"refresh_token"`
+			IsChirpyRed  bool      `json:"is_chirpy_red"`
 		}{
 			Id:           user.ID.String(),
 			CreateAt:     user.CreatedAt,
@@ -634,6 +641,7 @@ func main() {
 			Email:        user.Email,
 			Token:        token,
 			RefreshToken: refreshToken,
+			IsChirpyRed:  user.IsChirpyRed,
 		}
 
 		response, _ := json.Marshal(&responseStruct)
