@@ -712,6 +712,16 @@ func main() {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	})
 	m.HandleFunc("POST /api/polka/webhooks", func(w http.ResponseWriter, req *http.Request) {
+		token, err := auth.GetApiTokenFromHeader(req.Header)
+		fmt.Printf("TOKEN: %s\n", token)
+
+		if err != nil || token != apiCfg.polkaApiKey {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write([]byte(`{"error": "Unauthorized Request"}`))
+			return
+		}
+
 		type data struct {
 			UserId string `json:"user_id"`
 		}
@@ -722,7 +732,7 @@ func main() {
 
 		var params webhookParams
 		decoder := json.NewDecoder(req.Body)
-		err := decoder.Decode(&params)
+		err = decoder.Decode(&params)
 
 		if err != nil || params.Event == "" || params.Data.UserId == "" {
 			w.WriteHeader(http.StatusBadRequest)
