@@ -99,3 +99,36 @@ func (q *Queries) SelectChirps(ctx context.Context) ([]Chirp, error) {
 	}
 	return items, nil
 }
+
+const selectChirpsByUserId = `-- name: SelectChirpsByUserId :many
+SELECT id, user_id, body, created_at, updated_at FROM chirps WHERE user_id = $1
+`
+
+func (q *Queries) SelectChirpsByUserId(ctx context.Context, userID uuid.NullUUID) ([]Chirp, error) {
+	rows, err := q.db.QueryContext(ctx, selectChirpsByUserId, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Chirp
+	for rows.Next() {
+		var i Chirp
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Body,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
