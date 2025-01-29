@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -257,6 +258,11 @@ func main() {
 		}
 
 		userID := req.URL.Query().Get("author_id")
+		sortBy := req.URL.Query().Get("sort")
+
+		if sortBy != "asc" && sortBy != "desc" {
+			sortBy = "asc"
+		}
 
 		if userID != "" {
 			parsedUserID, err := uuid.Parse(userID)
@@ -296,6 +302,13 @@ func main() {
 				}
 			}
 
+			sort.Slice(response, func(i, j int) bool {
+				if sortBy == "asc" {
+					return response[i].CreateAt.Before(response[j].CreateAt)
+				}
+				return response[i].CreateAt.After(response[j].CreateAt)
+			})
+
 			responseJSON, _ := json.Marshal(&response)
 			w.Write([]byte(responseJSON))
 			return
@@ -324,6 +337,13 @@ func main() {
 				UserId:     chirp.UserID.UUID.String(),
 			}
 		}
+
+		sort.Slice(response, func(i, j int) bool {
+			if sortBy == "asc" {
+				return response[i].CreateAt.Before(response[j].CreateAt)
+			}
+			return response[i].CreateAt.After(response[j].CreateAt)
+		})
 
 		responseJSON, _ := json.Marshal(&response)
 		w.Write([]byte(responseJSON))
