@@ -36,7 +36,7 @@ go run main.go
 - POST /api/revoke - Revoke token
 ### Chirps
 - GET /api/chirps - List chirps
-- GET /api/chirps/{id} - Get chirp
+- GET /api/chirps?author_id=id,sort?=asc\desc - Get chirp
 - POST /api/chirps - Create chirp
 ### Admin
 - GET /admin/metrics - View metrics
@@ -62,3 +62,9 @@ Located in schema:
 - github.com/joho/godotenv
 - github.com/lib/pq
 - golang.org/x/crypto
+
+## Contributing
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+This project is licensed under the MIT License - see the LICENSE file for details.
